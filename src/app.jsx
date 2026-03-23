@@ -8,6 +8,7 @@ export default function App() {
     const [view, setView] = useState("calendar"); // 🔥 navegación real
     const [events, setEvents] = useState([]);
     const [clientes, setClientes] = useState([]);
+    const [zonaAsignada, setZonaAsignada] = useState(null);
 
     const [form, setForm] = useState({
         title: "",
@@ -37,6 +38,42 @@ export default function App() {
         const { data } = await supabase.from("clientes").select("*");
         setClientes(data);
     };
+
+    const loadEventoHoy = async () => {
+        const today = new Date().toISOString().split("T")[0];
+
+        const { data } = await supabase
+            .from("eventos")
+            .select("*")
+            .eq("fecha", today)
+            .limit(1);
+
+        if (data.length > 0) {
+            setZonaAsignada(data[0].zona_id);
+        }
+    };
+
+    const loadClientesZona = async () => {
+        if (!zonaAsignada) return;
+
+        const { data } = await supabase
+            .from("clientes")
+            .select("*")
+            .eq("zona_id", zonaAsignada)
+            .gt("deuda", 0);
+
+        setClientes(data);
+    };
+
+    useEffect(() => {
+        loadEventoHoy();
+    }, []);
+
+    useEffect(() => {
+        if (zonaAsignada) {
+            loadClientesZona();
+        }
+    }, [zonaAsignada]);
 
     // ➕ CREAR EVENTO
     const handleAddEvent = async () => {
@@ -102,13 +139,13 @@ export default function App() {
                 {/* 👥 CLIENTES */}
                 {view === "clientes" && (
                     <div>
-                        <h3>Clientes Morosos</h3>
+                        <h3>Zona asignada</h3>
 
                         {clientes.map((c) => (
-                            <div key={c.id} className="cliente">
+                            <div key={c.id} className="card">
                                 <p>{c.nombre}</p>
+                                <p>📍 {c.ip}</p>
                                 <p>💰 ${c.deuda}</p>
-                                <button onClick={() => pagarCliente(c)}>Cobrar</button>
                             </div>
                         ))}
                     </div>
