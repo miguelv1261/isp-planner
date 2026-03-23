@@ -5,147 +5,172 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { supabase } from "./supabase";
 
 export default function App() {
-    const [events, setEvents] = useState([]);
-    const [clientes, setClientes] = useState([]);
-    const [form, setForm] = useState({
-        title: "",
-        asesor: "Asesor 1",
-        zona: "Centro",
-        ciudad: "Puyo",
-        tipo: "Cobro",
-        objetivo: "",
-        date: "",
-    });
+  const [events, setEvents] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [showForm, setShowForm] = useState(false);
 
-    // 🔽 cargar datos
-    useEffect(() => {
-        loadEvents();
-        loadClientes();
-    }, []);
+  const [form, setForm] = useState({
+    title: "",
+    asesor: "Asesor 1",
+    zona: "Centro",
+    ciudad: "Puyo",
+    tipo: "Cobro",
+    objetivo: "",
+    date: "",
+  });
 
-    const loadEvents = async () => {
-        const { data } = await supabase.from("eventos").select("*");
+  // 🔽 cargar datos
+  useEffect(() => {
+    loadEvents();
+    loadClientes();
+  }, []);
 
-        const formatted = data.map((e) => ({
-            id: e.id,
-            title: `${e.tipo === "Cobro" ? "💰" : e.tipo === "Venta" ? "🛒" : "🚗"} ${e.titulo}`,
-            date: e.fecha,
-            extendedProps: e,
-        }));
+  const loadEvents = async () => {
+    const { data } = await supabase.from("eventos").select("*");
 
-        setEvents(formatted);
-    };
+    const formatted = data.map((e) => ({
+      id: e.id,
+      title: `${e.tipo === "Cobro" ? "💰" : e.tipo === "Venta" ? "🛒" : "🚗"} ${e.titulo}`,
+      date: e.fecha,
+      extendedProps: e,
+    }));
 
-    const loadClientes = async () => {
-        const { data } = await supabase.from("clientes").select("*");
-        setClientes(data);
-    };
+    setEvents(formatted);
+  };
 
-    // ➕ crear evento
-    const handleAddEvent = async () => {
-        await supabase.from("eventos").insert([
-            {
-                titulo: form.title,
-                fecha: form.date,
-                asesor: form.asesor,
-                zona: form.zona,
-                ciudad: form.ciudad,
-                tipo: form.tipo,
-                objetivo: form.objetivo,
-            },
-        ]);
+  const loadClientes = async () => {
+    const { data } = await supabase.from("clientes").select("*");
+    setClientes(data);
+  };
 
-        loadEvents();
-    };
+  // ➕ crear evento
+  const handleAddEvent = async () => {
+    if (!form.title || !form.date) return alert("Falta info");
 
-    // 📅 seleccionar fecha
-    const handleDateClick = (arg) => {
-        setForm({ ...form, date: arg.dateStr });
-    };
+    await supabase.from("eventos").insert([
+      {
+        titulo: form.title,
+        fecha: form.date,
+        asesor: form.asesor,
+        zona: form.zona,
+        ciudad: form.ciudad,
+        tipo: form.tipo,
+        objetivo: form.objetivo,
+      },
+    ]);
 
-    // 🔁 mover evento
-    const handleEventDrop = async (info) => {
-        await supabase
-            .from("eventos")
-            .update({ fecha: info.event.startStr })
-            .eq("id", info.event.id);
-    };
+    setShowForm(false);
+    loadEvents();
+  };
 
-    // 💰 marcar cliente pagado
-    const pagarCliente = async (cliente) => {
-        await supabase
-            .from("clientes")
-            .update({ deuda: 0, estado: "pagado" })
-            .eq("id", cliente.id);
+  // 📅 seleccionar fecha
+  const handleDateClick = (arg) => {
+    setForm({ ...form, date: arg.dateStr });
+    setShowForm(true);
+  };
 
-        loadClientes();
-    };
+  // 🔁 mover evento
+  const handleEventDrop = async (info) => {
+    await supabase
+      .from("eventos")
+      .update({ fecha: info.event.startStr })
+      .eq("id", info.event.id);
+  };
 
-    return (
-        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: "10px" }}>
+  // 💰 pagar cliente
+  const pagarCliente = async (cliente) => {
+    await supabase
+      .from("clientes")
+      .update({ deuda: 0, estado: "pagado" })
+      .eq("id", cliente.id);
 
-            {/* FORM */}
-            <div>
-                <h3>Nueva Actividad</h3>
+    loadClientes();
+  };
 
-                <input placeholder="Titulo"
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                />
+  return (
+    <div className="app">
 
-                <select onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
-                    <option>Cobro</option>
-                    <option>Venta</option>
-                    <option>Viaje</option>
-                </select>
+      {/* HEADER */}
+      <div className="header">
+        ISP Planner
+      </div>
 
-                <select onChange={(e) => setForm({ ...form, asesor: e.target.value })}>
-                    <option>Asesor 1</option>
-                    <option>Asesor 2</option>
-                </select>
+      {/* CONTENIDO */}
+      <div className="content">
 
-                <input placeholder="Zona"
-                    onChange={(e) => setForm({ ...form, zona: e.target.value })}
-                />
+        {/* CALENDARIO */}
+        <FullCalendar
+          plugins={[dayGridPlugin, interactionPlugin]}
+          initialView="dayGridDay"
+          events={events}
+          dateClick={handleDateClick}
+          editable={true}
+          eventDrop={handleEventDrop}
+          height="100%"
+          headerToolbar={{
+            left: "prev,next",
+            center: "title",
+            right: ""
+          }}
+          eventClassNames={(arg) => {
+            const tipo = arg.event.extendedProps.tipo;
+            if (tipo === "Cobro") return ["event-cobro"];
+            if (tipo === "Venta") return ["event-venta"];
+            if (tipo === "Viaje") return ["event-viaje"];
+          }}
+        />
 
-                <input placeholder="Ciudad"
-                    onChange={(e) => setForm({ ...form, ciudad: e.target.value })}
-                />
+        {/* CLIENTES (modo lista rápida) */}
+        <div style={{ padding: "10px" }}>
+          <h3>Clientes hoy</h3>
 
-                <input placeholder="Objetivo"
-                    onChange={(e) => setForm({ ...form, objetivo: e.target.value })}
-                />
-
-                <button onClick={handleAddEvent}>Guardar</button>
-
-                <hr />
-
-                <h3>Clientes Morosos</h3>
-
-                {clientes.map((c) => (
-                    <div key={c.id} style={{ borderBottom: "1px solid #ccc" }}>
-                        <p>{c.nombre} - ${c.deuda}</p>
-                        <button onClick={() => pagarCliente(c)}>Pagar</button>
-                    </div>
-                ))}
+          {clientes.map((c) => (
+            <div key={c.id} className="cliente">
+              <p>{c.nombre}</p>
+              <p>💰 ${c.deuda}</p>
+              <button onClick={() => pagarCliente(c)}>Cobrar</button>
             </div>
-
-            {/* CALENDARIO */}
-            <FullCalendar
-                plugins={[dayGridPlugin, interactionPlugin]}
-                initialView="dayGridMonth"
-                events={events}
-                dateClick={handleDateClick}
-                editable={true}
-                eventDrop={handleEventDrop}
-                height="90vh"
-                eventClassNames={(arg) => {
-                    const tipo = arg.event.extendedProps.tipo;
-                    if (tipo === "Cobro") return ["event-cobro"];
-                    if (tipo === "Venta") return ["event-venta"];
-                    if (tipo === "Viaje") return ["event-viaje"];
-                }}
-
-            />
+          ))}
         </div>
-    );
+
+      </div>
+
+      {/* BOTÓN FLOTANTE */}
+      <button className="fab" onClick={() => setShowForm(true)}>
+        +
+      </button>
+
+      {/* MODAL FORM */}
+      {showForm && (
+        <div className="modal">
+          <div className="modal-content">
+
+            <h3>Nueva Actividad</h3>
+
+            <input placeholder="Titulo"
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+
+            <select onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+              <option>Cobro</option>
+              <option>Venta</option>
+              <option>Viaje</option>
+            </select>
+
+            <button onClick={handleAddEvent}>Guardar</button>
+            <button onClick={() => setShowForm(false)}>Cancelar</button>
+
+          </div>
+        </div>
+      )}
+
+      {/* NAVBAR */}
+      <div className="bottom-nav">
+        <button>📅</button>
+        <button>👥</button>
+        <button onClick={() => setShowForm(true)}>➕</button>
+      </div>
+
+    </div>
+  );
 }
