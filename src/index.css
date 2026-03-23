@@ -39,7 +39,8 @@
   margin-bottom: 10px;
 }
 
-.form input, .form select {
+.form input,
+.form select {
   width: 100%;
   padding: 10px;
   margin-bottom: 10px;
@@ -51,4 +52,12 @@
   background: #3b82f6;
   color: white;
   border: none;
+}
+
+.card {
+  background: white;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }

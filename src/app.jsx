@@ -5,146 +5,157 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { supabase } from "./supabase";
 
 export default function App() {
-  const [view, setView] = useState("calendar"); // 🔥 navegación real
-  const [events, setEvents] = useState([]);
-  const [clientes, setClientes] = useState([]);
+    const [view, setView] = useState("calendar"); // 🔥 navegación real
+    const [events, setEvents] = useState([]);
+    const [clientes, setClientes] = useState([]);
 
-  const [form, setForm] = useState({
-    title: "",
-    tipo: "Cobro",
-    date: "",
-  });
+    const [form, setForm] = useState({
+        title: "",
+        tipo: "Cobro",
+        date: "",
+    });
 
-  useEffect(() => {
-    loadEvents();
-    loadClientes();
-  }, []);
+    useEffect(() => {
+        loadEvents();
+        loadClientes();
+    }, []);
+    const isMobile = window.innerWidth < 768;
+    const loadEvents = async () => {
+        const { data } = await supabase.from("eventos").select("*");
 
-  const loadEvents = async () => {
-    const { data } = await supabase.from("eventos").select("*");
+        const formatted = data.map((e) => ({
+            id: e.id,
+            title: `${e.tipo === "Cobro" ? "💰" : e.tipo === "Venta" ? "🛒" : "🚗"} ${e.titulo}`,
+            date: e.fecha,
+            extendedProps: e,
+        }));
 
-    const formatted = data.map((e) => ({
-      id: e.id,
-      title: `${e.tipo === "Cobro" ? "💰" : e.tipo === "Venta" ? "🛒" : "🚗"} ${e.titulo}`,
-      date: e.fecha,
-      extendedProps: e,
-    }));
+        setEvents(formatted);
+    };
 
-    setEvents(formatted);
-  };
+    const loadClientes = async () => {
+        const { data } = await supabase.from("clientes").select("*");
+        setClientes(data);
+    };
 
-  const loadClientes = async () => {
-    const { data } = await supabase.from("clientes").select("*");
-    setClientes(data);
-  };
+    // ➕ CREAR EVENTO
+    const handleAddEvent = async () => {
+        if (!form.title || !form.date) return alert("Completa los datos");
 
-  // ➕ CREAR EVENTO
-  const handleAddEvent = async () => {
-    if (!form.title || !form.date) return alert("Completa los datos");
+        await supabase.from("eventos").insert([
+            {
+                titulo: form.title,
+                fecha: form.date,
+                tipo: form.tipo,
+            },
+        ]);
 
-    await supabase.from("eventos").insert([
-      {
-        titulo: form.title,
-        fecha: form.date,
-        tipo: form.tipo,
-      },
-    ]);
+        setView("calendar");
+        loadEvents();
+    };
 
-    setView("calendar");
-    loadEvents();
-  };
+    // 💰 PAGAR CLIENTE
+    const pagarCliente = async (c) => {
+        await supabase
+            .from("clientes")
+            .update({ deuda: 0, estado: "pagado" })
+            .eq("id", c.id);
 
-  // 💰 PAGAR CLIENTE
-  const pagarCliente = async (c) => {
-    await supabase
-      .from("clientes")
-      .update({ deuda: 0, estado: "pagado" })
-      .eq("id", c.id);
+        loadClientes();
+    };
 
-    loadClientes();
-  };
+    return (
+        <div className="app">
 
-  return (
-    <div className="app">
+            {/* HEADER */}
+            <div className="header">
+                ISP Planner
+            </div>
 
-      {/* HEADER */}
-      <div className="header">
-        ISP Planner
-      </div>
+            {/* CONTENIDO */}
+            <div className="content">
 
-      {/* CONTENIDO */}
-      <div className="content">
+                {/* 📅 CALENDARIO */}
+                {view === "calendar" && !isMobile && (
+                    <FullCalendar
+                        plugins={[dayGridPlugin, interactionPlugin]}
+                        initialView="dayGridMonth"
+                        events={events}
+                        height="100%"
+                    />
+                )}
 
-        {/* 📅 CALENDARIO */}
-        {view === "calendar" && (
-          <FullCalendar
-            plugins={[dayGridPlugin, interactionPlugin]}
-            initialView="dayGridDay"
-            events={events}
-            height="100%"
-            dateClick={(arg) =>
-              setForm({ ...form, date: arg.dateStr }) || setView("create")
-            }
-          />
-        )}
+                {/* 📱 MODO MÓVIL */}
+                {view === "calendar" && isMobile && (
+                    <div>
+                        <h3>Actividades del día</h3>
 
-        {/* 👥 CLIENTES */}
-        {view === "clientes" && (
-          <div>
-            <h3>Clientes Morosos</h3>
+                        {events.map((e) => (
+                            <div key={e.id} className="cliente">
+                                <p>{e.title}</p>
+                                <p>📅 {e.date}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
-            {clientes.map((c) => (
-              <div key={c.id} className="cliente">
-                <p>{c.nombre}</p>
-                <p>💰 ${c.deuda}</p>
-                <button onClick={() => pagarCliente(c)}>Cobrar</button>
-              </div>
-            ))}
-          </div>
-        )}
+                {/* 👥 CLIENTES */}
+                {view === "clientes" && (
+                    <div>
+                        <h3>Clientes Morosos</h3>
 
-        {/* ➕ CREAR ACTIVIDAD */}
-        {view === "create" && (
-          <div className="form">
-            <h3>Nueva Actividad</h3>
+                        {clientes.map((c) => (
+                            <div key={c.id} className="cliente">
+                                <p>{c.nombre}</p>
+                                <p>💰 ${c.deuda}</p>
+                                <button onClick={() => pagarCliente(c)}>Cobrar</button>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
-            <input
-              placeholder="Ej: Cobros Centro"
-              onChange={(e) =>
-                setForm({ ...form, title: e.target.value })
-              }
-            />
+                {/* ➕ CREAR ACTIVIDAD */}
+                {view === "create" && (
+                    <div className="form">
+                        <h3>Nueva Actividad</h3>
 
-            <select
-              onChange={(e) =>
-                setForm({ ...form, tipo: e.target.value })
-              }
-            >
-              <option>Cobro</option>
-              <option>Venta</option>
-              <option>Viaje</option>
-            </select>
+                        <input
+                            placeholder="Ej: Cobros Centro"
+                            onChange={(e) =>
+                                setForm({ ...form, title: e.target.value })
+                            }
+                        />
 
-            <input
-              type="date"
-              onChange={(e) =>
-                setForm({ ...form, date: e.target.value })
-              }
-            />
+                        <select
+                            onChange={(e) =>
+                                setForm({ ...form, tipo: e.target.value })
+                            }
+                        >
+                            <option>Cobro</option>
+                            <option>Venta</option>
+                            <option>Viaje</option>
+                        </select>
 
-            <button onClick={handleAddEvent}>Guardar</button>
-          </div>
-        )}
+                        <input
+                            type="date"
+                            onChange={(e) =>
+                                setForm({ ...form, date: e.target.value })
+                            }
+                        />
 
-      </div>
+                        <button onClick={handleAddEvent}>Guardar</button>
+                    </div>
+                )}
 
-      {/* 🔥 NAV REAL FUNCIONAL */}
-      <div className="bottom-nav">
-        <button onClick={() => setView("calendar")}>📅</button>
-        <button onClick={() => setView("clientes")}>👥</button>
-        <button onClick={() => setView("create")}>➕</button>
-      </div>
+            </div>
 
-    </div>
-  );
+            {/* 🔥 NAV REAL FUNCIONAL */}
+            <div className="bottom-nav">
+                <button onClick={() => setView("calendar")}>📅</button>
+                <button onClick={() => setView("clientes")}>👥</button>
+                <button onClick={() => setView("create")}>➕</button>
+            </div>
+
+        </div>
+    );
 }
