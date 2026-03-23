@@ -59,11 +59,9 @@ export default function App() {
             .from("eventos")
             .select("*")
             .eq("fecha", today)
-            .limit(1);
+            .eq("asesor_id", 1); // 👈 dinámico luego
 
-        if (data.length > 0) {
-            setEventoHoy(data[0]);
-        }
+        setEventoHoy(data);
     };
 
     // 🔽 CLIENTES POR ZONA
@@ -72,10 +70,28 @@ export default function App() {
             .from("clientes")
             .select("*")
             .eq("zona_id", zona_id)
-            .gt("deuda", 0);
+            .gt("deuda", 0)
+            .order("ip");
 
-        setClientes(data);
+        return data;
     };
+
+    useEffect(() => {
+        if (!eventoHoy.length) return;
+
+        const cargar = async () => {
+            let allClientes = [];
+
+            for (let e of eventoHoy) {
+                const clientesZona = await loadClientesZona(e.zona_id);
+                allClientes = [...allClientes, ...clientesZona];
+            }
+
+            setClientes(allClientes);
+        };
+
+        cargar();
+    }, [eventoHoy]);
 
     // 🔥 CUANDO HAY EVENTO DEL DÍA
     useEffect(() => {
