@@ -5,21 +5,16 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { supabase } from "./supabase";
 
 export default function App() {
+  const [view, setView] = useState("calendar"); // 🔥 navegación real
   const [events, setEvents] = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [showForm, setShowForm] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
-    asesor: "Asesor 1",
-    zona: "Centro",
-    ciudad: "Puyo",
     tipo: "Cobro",
-    objetivo: "",
     date: "",
   });
 
-  // 🔽 cargar datos
   useEffect(() => {
     loadEvents();
     loadClientes();
@@ -43,46 +38,28 @@ export default function App() {
     setClientes(data);
   };
 
-  // ➕ crear evento
+  // ➕ CREAR EVENTO
   const handleAddEvent = async () => {
-    if (!form.title || !form.date) return alert("Falta info");
+    if (!form.title || !form.date) return alert("Completa los datos");
 
     await supabase.from("eventos").insert([
       {
         titulo: form.title,
         fecha: form.date,
-        asesor: form.asesor,
-        zona: form.zona,
-        ciudad: form.ciudad,
         tipo: form.tipo,
-        objetivo: form.objetivo,
       },
     ]);
 
-    setShowForm(false);
+    setView("calendar");
     loadEvents();
   };
 
-  // 📅 seleccionar fecha
-  const handleDateClick = (arg) => {
-    setForm({ ...form, date: arg.dateStr });
-    setShowForm(true);
-  };
-
-  // 🔁 mover evento
-  const handleEventDrop = async (info) => {
-    await supabase
-      .from("eventos")
-      .update({ fecha: info.event.startStr })
-      .eq("id", info.event.id);
-  };
-
-  // 💰 pagar cliente
-  const pagarCliente = async (cliente) => {
+  // 💰 PAGAR CLIENTE
+  const pagarCliente = async (c) => {
     await supabase
       .from("clientes")
       .update({ deuda: 0, estado: "pagado" })
-      .eq("id", cliente.id);
+      .eq("id", c.id);
 
     loadClientes();
   };
@@ -98,77 +75,74 @@ export default function App() {
       {/* CONTENIDO */}
       <div className="content">
 
-        {/* CALENDARIO */}
-        <FullCalendar
-          plugins={[dayGridPlugin, interactionPlugin]}
-          initialView="dayGridDay"
-          events={events}
-          dateClick={handleDateClick}
-          editable={true}
-          eventDrop={handleEventDrop}
-          height="100%"
-          headerToolbar={{
-            left: "prev,next",
-            center: "title",
-            right: ""
-          }}
-          eventClassNames={(arg) => {
-            const tipo = arg.event.extendedProps.tipo;
-            if (tipo === "Cobro") return ["event-cobro"];
-            if (tipo === "Venta") return ["event-venta"];
-            if (tipo === "Viaje") return ["event-viaje"];
-          }}
-        />
+        {/* 📅 CALENDARIO */}
+        {view === "calendar" && (
+          <FullCalendar
+            plugins={[dayGridPlugin, interactionPlugin]}
+            initialView="dayGridDay"
+            events={events}
+            height="100%"
+            dateClick={(arg) =>
+              setForm({ ...form, date: arg.dateStr }) || setView("create")
+            }
+          />
+        )}
 
-        {/* CLIENTES (modo lista rápida) */}
-        <div style={{ padding: "10px" }}>
-          <h3>Clientes hoy</h3>
+        {/* 👥 CLIENTES */}
+        {view === "clientes" && (
+          <div>
+            <h3>Clientes Morosos</h3>
 
-          {clientes.map((c) => (
-            <div key={c.id} className="cliente">
-              <p>{c.nombre}</p>
-              <p>💰 ${c.deuda}</p>
-              <button onClick={() => pagarCliente(c)}>Cobrar</button>
-            </div>
-          ))}
-        </div>
+            {clientes.map((c) => (
+              <div key={c.id} className="cliente">
+                <p>{c.nombre}</p>
+                <p>💰 ${c.deuda}</p>
+                <button onClick={() => pagarCliente(c)}>Cobrar</button>
+              </div>
+            ))}
+          </div>
+        )}
 
-      </div>
-
-      {/* BOTÓN FLOTANTE */}
-      <button className="fab" onClick={() => setShowForm(true)}>
-        +
-      </button>
-
-      {/* MODAL FORM */}
-      {showForm && (
-        <div className="modal">
-          <div className="modal-content">
-
+        {/* ➕ CREAR ACTIVIDAD */}
+        {view === "create" && (
+          <div className="form">
             <h3>Nueva Actividad</h3>
 
-            <input placeholder="Titulo"
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            <input
+              placeholder="Ej: Cobros Centro"
+              onChange={(e) =>
+                setForm({ ...form, title: e.target.value })
+              }
             />
 
-            <select onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+            <select
+              onChange={(e) =>
+                setForm({ ...form, tipo: e.target.value })
+              }
+            >
               <option>Cobro</option>
               <option>Venta</option>
               <option>Viaje</option>
             </select>
 
+            <input
+              type="date"
+              onChange={(e) =>
+                setForm({ ...form, date: e.target.value })
+              }
+            />
+
             <button onClick={handleAddEvent}>Guardar</button>
-            <button onClick={() => setShowForm(false)}>Cancelar</button>
-
           </div>
-        </div>
-      )}
+        )}
 
-      {/* NAVBAR */}
+      </div>
+
+      {/* 🔥 NAV REAL FUNCIONAL */}
       <div className="bottom-nav">
-        <button>📅</button>
-        <button>👥</button>
-        <button onClick={() => setShowForm(true)}>➕</button>
+        <button onClick={() => setView("calendar")}>📅</button>
+        <button onClick={() => setView("clientes")}>👥</button>
+        <button onClick={() => setView("create")}>➕</button>
       </div>
 
     </div>
