@@ -5,22 +5,33 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { supabase } from "./supabase";
 
 export default function App() {
-    const [view, setView] = useState("calendar"); // 🔥 navegación real
+
+    const [view, setView] = useState("calendar");
+
     const [events, setEvents] = useState([]);
     const [clientes, setClientes] = useState([]);
-    const [zonaAsignada, setZonaAsignada] = useState(null);
+    const [zonas, setZonas] = useState([]);
+
+    const [eventoHoy, setEventoHoy] = useState(null);
+
+    const isMobile = window.innerWidth < 768;
 
     const [form, setForm] = useState({
         title: "",
         tipo: "Cobro",
         date: "",
+        zona_id: "",
+        asesor: "Asesor 1"
     });
 
+    // 🔥 CARGA INICIAL
     useEffect(() => {
         loadEvents();
-        loadClientes();
+        loadZonas();
+        loadEventoHoy();
     }, []);
-    const isMobile = window.innerWidth < 768;
+
+    // 🔽 EVENTOS
     const loadEvents = async () => {
         const { data } = await supabase.from("eventos").select("*");
 
@@ -34,11 +45,13 @@ export default function App() {
         setEvents(formatted);
     };
 
-    const loadClientes = async () => {
-        const { data } = await supabase.from("clientes").select("*");
-        setClientes(data);
+    // 🔽 ZONAS
+    const loadZonas = async () => {
+        const { data } = await supabase.from("zonas").select("*");
+        setZonas(data);
     };
 
+    // 🔽 EVENTO DEL DÍA
     const loadEventoHoy = async () => {
         const today = new Date().toISOString().split("T")[0];
 
@@ -49,56 +62,44 @@ export default function App() {
             .limit(1);
 
         if (data.length > 0) {
-            setZonaAsignada(data[0].zona_id);
+            setEventoHoy(data[0]);
         }
     };
 
-    const loadClientesZona = async () => {
-        if (!zonaAsignada) return;
-
+    // 🔽 CLIENTES POR ZONA
+    const loadClientesZona = async (zona_id) => {
         const { data } = await supabase
             .from("clientes")
             .select("*")
-            .eq("zona_id", zonaAsignada)
+            .eq("zona_id", zona_id)
             .gt("deuda", 0);
 
         setClientes(data);
     };
 
+    // 🔥 CUANDO HAY EVENTO DEL DÍA
     useEffect(() => {
-        loadEventoHoy();
-    }, []);
-
-    useEffect(() => {
-        if (zonaAsignada) {
-            loadClientesZona();
+        if (eventoHoy?.zona_id) {
+            loadClientesZona(eventoHoy.zona_id);
         }
-    }, [zonaAsignada]);
+    }, [eventoHoy]);
 
     // ➕ CREAR EVENTO
     const handleAddEvent = async () => {
-        if (!form.title || !form.date) return alert("Completa los datos");
+        if (!form.title || !form.date || !form.zona_id) {
+            return alert("Completa todos los campos");
+        }
 
-        await supabase.from("eventos").insert([
-            {
-                titulo: form.title,
-                fecha: form.date,
-                tipo: form.tipo,
-            },
-        ]);
+        await supabase.from("eventos").insert([{
+            titulo: form.title,
+            fecha: form.date,
+            tipo: form.tipo,
+            zona_id: form.zona_id,
+            asesor: form.asesor
+        }]);
 
         setView("calendar");
         loadEvents();
-    };
-
-    // 💰 PAGAR CLIENTE
-    const pagarCliente = async (c) => {
-        await supabase
-            .from("clientes")
-            .update({ deuda: 0, estado: "pagado" })
-            .eq("id", c.id);
-
-        loadClientes();
     };
 
     return (
@@ -109,10 +110,9 @@ export default function App() {
                 ISP Planner
             </div>
 
-            {/* CONTENIDO */}
             <div className="content">
 
-                {/* 📅 CALENDARIO */}
+                {/* 📅 CALENDARIO (OFICINA) */}
                 {view === "calendar" && !isMobile && (
                     <FullCalendar
                         plugins={[dayGridPlugin, interactionPlugin]}
@@ -122,62 +122,81 @@ export default function App() {
                     />
                 )}
 
-                {/* 📱 MODO MÓVIL */}
+                {/* 📱 ASESOR (MÓVIL REAL) */}
                 {view === "calendar" && isMobile && (
                     <div>
-                        <h3>Actividades del día</h3>
+                        <h3>Trabajo de Hoy</h3>
 
-                        {events.map((e) => (
-                            <div key={e.id} className="cliente">
-                                <p>{e.title}</p>
-                                <p>📅 {e.date}</p>
-                            </div>
-                        ))}
+                        {!eventoHoy && <p>No tienes actividades asignadas</p>}
+
+                        {eventoHoy && (
+                            <>
+                                <div className="card">
+                                    <h4>{eventoHoy.titulo}</h4>
+                                    <p>📅 {eventoHoy.fecha}</p>
+                                </div>
+
+                                <h4>Clientes en tu zona</h4>
+
+                                {clientes.map((c) => (
+                                    <div key={c.id} className="card">
+                                        <p>{c.nombre}</p>
+                                        <p>📍 {c.ip}</p>
+                                        <p>💰 ${c.deuda}</p>
+                                    </div>
+                                ))}
+                            </>
+                        )}
                     </div>
                 )}
 
-                {/* 👥 CLIENTES */}
+                {/* 👥 CLIENTES (OFICINA) */}
                 {view === "clientes" && (
                     <div>
-                        <h3>Zona asignada</h3>
+                        <h3>Clientes Morosos</h3>
 
                         {clientes.map((c) => (
                             <div key={c.id} className="card">
                                 <p>{c.nombre}</p>
-                                <p>📍 {c.ip}</p>
-                                <p>💰 ${c.deuda}</p>
+                                <p>{c.ip}</p>
+                                <p>${c.deuda}</p>
                             </div>
                         ))}
                     </div>
                 )}
 
-                {/* ➕ CREAR ACTIVIDAD */}
+                {/* ➕ CREAR EVENTO (OFICINA) */}
                 {view === "create" && (
                     <div className="form">
                         <h3>Nueva Actividad</h3>
 
                         <input
-                            placeholder="Ej: Cobros Centro"
-                            onChange={(e) =>
-                                setForm({ ...form, title: e.target.value })
-                            }
+                            placeholder="Titulo"
+                            onChange={(e) => setForm({ ...form, title: e.target.value })}
                         />
 
                         <select
-                            onChange={(e) =>
-                                setForm({ ...form, tipo: e.target.value })
-                            }
+                            onChange={(e) => setForm({ ...form, tipo: e.target.value })}
                         >
                             <option>Cobro</option>
                             <option>Venta</option>
                             <option>Viaje</option>
                         </select>
 
+                        <select
+                            onChange={(e) => setForm({ ...form, zona_id: e.target.value })}
+                        >
+                            <option value="">Seleccionar zona</option>
+                            {zonas.map((z) => (
+                                <option key={z.id} value={z.id}>
+                                    {z.nombre}
+                                </option>
+                            ))}
+                        </select>
+
                         <input
                             type="date"
-                            onChange={(e) =>
-                                setForm({ ...form, date: e.target.value })
-                            }
+                            onChange={(e) => setForm({ ...form, date: e.target.value })}
                         />
 
                         <button onClick={handleAddEvent}>Guardar</button>
@@ -186,7 +205,7 @@ export default function App() {
 
             </div>
 
-            {/* 🔥 NAV REAL FUNCIONAL */}
+            {/* NAV */}
             <div className="bottom-nav">
                 <button onClick={() => setView("calendar")}>📅</button>
                 <button onClick={() => setView("clientes")}>👥</button>
