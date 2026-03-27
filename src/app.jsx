@@ -24,11 +24,50 @@ export default function App() {
         asesor: "Asesor 1"
     });
 
+    // 🔔 PERMISOS DE NOTIFICACIÓN
+    useEffect(() => {
+        if (Notification.permission !== "granted") {
+            Notification.requestPermission();
+        }
+    }, []);
+
     // 🔥 CARGA INICIAL
     useEffect(() => {
         loadEvents();
         loadZonas();
         loadEventoHoy();
+    }, []);
+
+    // 🔔 REALTIME (NOTIFICACIONES)
+    useEffect(() => {
+        const channel = supabase
+            .channel('eventos-realtime')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'eventos'
+                },
+                (payload) => {
+
+                    // 🔔 NOTIFICACIÓN TIPO APP
+                    if (Notification.permission === "granted") {
+                        new Notification("Nueva actividad", {
+                            body: `${payload.new.asesor}: ${payload.new.titulo}`
+                        });
+                    } else {
+                        alert(`📢 ${payload.new.asesor} hizo: ${payload.new.titulo}`);
+                    }
+
+                    loadEvents();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     // 🔽 EVENTOS
@@ -59,9 +98,11 @@ export default function App() {
             .from("eventos")
             .select("*")
             .eq("fecha", today)
-            .eq("asesor_id", 1); // 👈 dinámico luego
+            .limit(1);
 
-        setEventoHoy(data);
+        if (data.length > 0) {
+            setEventoHoy(data[0]);
+        }
     };
 
     // 🔽 CLIENTES POR ZONA
@@ -70,28 +111,10 @@ export default function App() {
             .from("clientes")
             .select("*")
             .eq("zona_id", zona_id)
-            .gt("deuda", 0)
-            .order("ip");
+            .gt("deuda", 0);
 
-        return data;
+        setClientes(data);
     };
-
-    useEffect(() => {
-        if (!eventoHoy.length) return;
-
-        const cargar = async () => {
-            let allClientes = [];
-
-            for (let e of eventoHoy) {
-                const clientesZona = await loadClientesZona(e.zona_id);
-                allClientes = [...allClientes, ...clientesZona];
-            }
-
-            setClientes(allClientes);
-        };
-
-        cargar();
-    }, [eventoHoy]);
 
     // 🔥 CUANDO HAY EVENTO DEL DÍA
     useEffect(() => {
@@ -100,7 +123,7 @@ export default function App() {
         }
     }, [eventoHoy]);
 
-    // ➕ CREAR EVENTO
+    // ➕ CREAR EVENTO (OFICINA)
     const handleAddEvent = async () => {
         if (!form.title || !form.date || !form.zona_id) {
             return alert("Completa todos los campos");
@@ -118,6 +141,21 @@ export default function App() {
         loadEvents();
     };
 
+    // 🔥 REGISTRAR ACTIVIDAD (ASESOR)
+    const registrarActividad = async (cliente) => {
+        const today = new Date().toISOString().split("T")[0];
+
+        await supabase.from("eventos").insert([{
+            titulo: `Visita ${cliente.nombre}`,
+            fecha: today,
+            tipo: "Cobro",
+            zona_id: cliente.zona_id,
+            asesor: "Asesor 1"
+        }]);
+
+        loadEvents();
+    };
+
     return (
         <div className="app">
 
@@ -128,7 +166,7 @@ export default function App() {
 
             <div className="content">
 
-                {/* 📅 CALENDARIO (OFICINA) */}
+                {/* 📅 CALENDARIO */}
                 {view === "calendar" && !isMobile && (
                     <FullCalendar
                         plugins={[dayGridPlugin, interactionPlugin]}
@@ -138,7 +176,7 @@ export default function App() {
                     />
                 )}
 
-                {/* 📱 ASESOR (MÓVIL REAL) */}
+                {/* 📱 MÓVIL */}
                 {view === "calendar" && isMobile && (
                     <div>
                         <h3>Trabajo de Hoy</h3>
@@ -159,6 +197,10 @@ export default function App() {
                                         <p>{c.nombre}</p>
                                         <p>📍 {c.ip}</p>
                                         <p>💰 ${c.deuda}</p>
+
+                                        <button onClick={() => registrarActividad(c)}>
+                                            Registrar
+                                        </button>
                                     </div>
                                 ))}
                             </>
@@ -166,7 +208,7 @@ export default function App() {
                     </div>
                 )}
 
-                {/* 👥 CLIENTES (OFICINA) */}
+                {/* 👥 CLIENTES */}
                 {view === "clientes" && (
                     <div>
                         <h3>Clientes Morosos</h3>
@@ -181,7 +223,7 @@ export default function App() {
                     </div>
                 )}
 
-                {/* ➕ CREAR EVENTO (OFICINA) */}
+                {/* ➕ CREAR */}
                 {view === "create" && (
                     <div className="form">
                         <h3>Nueva Actividad</h3>
