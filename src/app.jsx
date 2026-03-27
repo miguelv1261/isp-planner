@@ -1,97 +1,36 @@
 import { useEffect, useState } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import interactionPlugin from "@fullcalendar/interaction";
 import { supabase } from "./supabase";
 
 export default function App() {
 
-    const [view, setView] = useState("calendar");
-
-    const [events, setEvents] = useState([]);
-    const [clientes, setClientes] = useState([]);
-    const [zonas, setZonas] = useState([]);
-
-    const [eventoHoy, setEventoHoy] = useState([]);
+    const [asesor, setAsesor] = useState(null);
+    const [eventos, setEventos] = useState([]);
 
     const isMobile = window.innerWidth < 768;
 
-    const [form, setForm] = useState({
-        title: "",
-        tipo: "Cobro",
-        date: "",
-        zona_id: "",
-        asesor: "Asesor 1"
-    });
-
-    // 🔔 PERMISOS DE NOTIFICACIÓN
+    // 🔔 permisos
     useEffect(() => {
         if (Notification.permission !== "granted") {
             Notification.requestPermission();
         }
     }, []);
 
-    // 🔥 CARGA INICIAL
-    useEffect(() => {
-        loadEvents();
-        loadZonas();
-        loadEventoHoy();
-    }, []);
-
-    // 🔔 REALTIME (NOTIFICACIONES)
+    // 🔄 realtime
     useEffect(() => {
         const channel = supabase
-            .channel('eventos-realtime')
+            .channel("eventos")
             .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'eventos'
-                },
-                (payload) => {
-
-                    // 🔔 NOTIFICACIÓN TIPO APP
-                    if (Notification.permission === "granted") {
-                        new Notification("Nueva actividad", {
-                            body: `${payload.new.asesor}: ${payload.new.titulo}`
-                        });
-                    } else {
-                        alert(`📢 ${payload.new.asesor} hizo: ${payload.new.titulo}`);
-                    }
-
-                    loadEvents();
-                }
+                "postgres_changes",
+                { event: "*", schema: "public", table: "eventos" },
+                () => loadEventosHoy()
             )
             .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => supabase.removeChannel(channel);
     }, []);
 
-    // 🔽 EVENTOS
-    const loadEvents = async () => {
-        const { data } = await supabase.from("eventos").select("*");
-
-        const formatted = data.map((e) => ({
-            id: e.id,
-            title: `${e.tipo === "Cobro" ? "💰" : e.tipo === "Venta" ? "🛒" : "🚗"} ${e.titulo}`,
-            date: e.fecha,
-            extendedProps: e,
-        }));
-
-        setEvents(formatted);
-    };
-
-    // 🔽 ZONAS
-    const loadZonas = async () => {
-        const { data } = await supabase.from("zonas").select("*");
-        setZonas(data);
-    };
-
-    // 🔽 EVENTO DEL DÍA
-    const loadEventoHoy = async () => {
+    // 📅 cargar eventos del día
+    const loadEventosHoy = async () => {
         const today = new Date().toISOString().split("T")[0];
 
         const { data } = await supabase
@@ -100,171 +39,78 @@ export default function App() {
             .eq("fecha", today)
             .order("id", { ascending: false });
 
-        setEventoHoy(data); // 🔥 ahora es ARRAY
+        setEventos(data || []);
     };
 
-    // 🔽 CLIENTES POR ZONA
-    const loadClientesZona = async (zona_id) => {
-        const { data } = await supabase
-            .from("clientes")
-            .select("*")
-            .eq("zona_id", zona_id)
-            .gt("deuda", 0);
-
-        setClientes(data);
-    };
-
-    // 🔥 CUANDO HAY EVENTO DEL DÍA
     useEffect(() => {
-        if (eventoHoy?.zona_id) {
-            loadClientesZona(eventoHoy.zona_id);
-        }
-    }, [eventoHoy]);
+        loadEventosHoy();
+    }, []);
 
-    // ➕ CREAR EVENTO (OFICINA)
-    const handleAddEvent = async () => {
-        if (!form.title || !form.date || !form.zona_id) {
-            return alert("Completa todos los campos");
-        }
-
-        await supabase.from("eventos").insert([{
-            titulo: form.title,
-            fecha: form.date,
-            tipo: form.tipo,
-            zona_id: form.zona_id,
-            asesor: form.asesor
-        }]);
-
-        setView("calendar");
-        loadEvents();
+    // ✅ completar evento
+    const completarEvento = async (evento) => {
+        await supabase
+            .from("eventos")
+            .update({
+                estado: "completado",
+                realizado_por: asesor,
+                fecha_completado: new Date().toISOString()
+            })
+            .eq("id", evento.id);
     };
 
-    // 🔥 REGISTRAR ACTIVIDAD (ASESOR)
-    const registrarActividad = async (cliente) => {
-        const today = new Date().toISOString().split("T")[0];
+    // 👤 seleccionar asesor
+    if (!asesor) {
+        return (
+            <div className="app center">
+                <h2>Selecciona Asesor</h2>
 
-        await supabase.from("eventos").insert([{
-            titulo: `Visita ${cliente.nombre}`,
-            fecha: today,
-            tipo: "Cobro",
-            zona_id: cliente.zona_id,
-            asesor: "Asesor 1"
-        }]);
-
-        loadEvents();
-    };
+                <button onClick={() => setAsesor("Asesor 1")}>Asesor 1</button>
+                <button onClick={() => setAsesor("Asesor 2")}>Asesor 2</button>
+            </div>
+        );
+    }
 
     return (
         <div className="app">
 
             {/* HEADER */}
             <div className="header">
-                ISP Planner
+                {asesor}
             </div>
 
+            {/* LISTA */}
             <div className="content">
 
-                {/* 📅 CALENDARIO */}
-                {view === "calendar" && !isMobile && (
-                    <FullCalendar
-                        plugins={[dayGridPlugin, interactionPlugin]}
-                        initialView="dayGridMonth"
-                        events={events}
-                        height="100%"
-                    />
-                )}
+                <h3>Actividades de hoy</h3>
 
-                {/* 📱 MÓVIL */}
-                {view === "calendar" && isMobile && (
-                    <div>
-                        <h3>Actividad del día</h3>
+                {eventos.length === 0 && <p>No hay actividades</p>}
 
-                        {eventoHoy.length === 0 && <p>No hay actividad hoy</p>}
+                {eventos.map((e) => (
+                    <div
+                        key={e.id}
+                        className={`card ${e.estado}`}
+                    >
+                        <div>
+                            <h4>
+                                {e.tipo === "Cobro" ? "💰" :
+                                 e.tipo === "Venta" ? "🛒" : "🚗"} {e.titulo}
+                            </h4>
 
-                        {eventoHoy.map((e) => (
-                            <div key={e.id} className="card">
-                                <h4>{e.titulo}</h4>
-                                <p>👤 {e.asesor}</p>
-                                <p>📅 {e.fecha}</p>
-                            </div>
-                        ))}
+                            <p>
+                                {e.estado === "completado"
+                                    ? `✅ ${e.realizado_por}`
+                                    : "⏳ Pendiente"}
+                            </p>
+                        </div>
 
-                        <h4>Clientes en zona</h4>
-
-                        {clientes.map((c) => (
-                            <div key={c.id} className="card">
-                                <p>{c.nombre}</p>
-                                <p>📍 {c.ip}</p>
-                                <p>💰 ${c.deuda}</p>
-
-                                <button onClick={() => registrarActividad(c)}>
-                                    Registrar
-                                </button>
-                            </div>
-                        ))}
+                        {e.estado !== "completado" && (
+                            <button onClick={() => completarEvento(e)}>
+                                Completar
+                            </button>
+                        )}
                     </div>
-                )}
+                ))}
 
-                {/* 👥 CLIENTES */}
-                {view === "clientes" && (
-                    <div>
-                        <h3>Clientes Morosos</h3>
-
-                        {clientes.map((c) => (
-                            <div key={c.id} className="card">
-                                <p>{c.nombre}</p>
-                                <p>{c.ip}</p>
-                                <p>${c.deuda}</p>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* ➕ CREAR */}
-                {view === "create" && (
-                    <div className="form">
-                        <h3>Nueva Actividad</h3>
-
-                        <input
-                            placeholder="Titulo"
-                            onChange={(e) => setForm({ ...form, title: e.target.value })}
-                        />
-
-                        <select
-                            onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-                        >
-                            <option>Cobro</option>
-                            <option>Venta</option>
-                            <option>Viaje</option>
-                        </select>
-
-                        <select
-                            onChange={(e) => setForm({ ...form, zona_id: e.target.value })}
-                        >
-                            <option value="">Seleccionar zona</option>
-                            {zonas.map((z) => (
-                                <option key={z.id} value={z.id}>
-                                    {z.nombre}
-                                </option>
-                            ))}
-                        </select>
-
-                        <input
-                            type="date"
-                            onChange={(e) => setForm({ ...form, date: e.target.value })}
-                        />
-
-                        <button onClick={handleAddEvent}>Guardar</button>
-                    </div>
-                )}
-
-            </div>
-
-            {/* NAV */}
-            <div className="bottom-nav">
-                <button onClick={() => setView("calendar")}>📅</button>
-                <button onClick={() => setView("clientes")}>👥</button>
-                <button onClick={() => setView("create")}>➕</button>
             </div>
 
         </div>
