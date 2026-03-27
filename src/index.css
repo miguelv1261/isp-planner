@@ -1,6 +1,14 @@
-.tipo-Cobro { background: #ffe082 !important; }
-.tipo-Venta { background: #81c784 !important; }
-.tipo-Viaje { background: #64b5f6 !important; }
+.tipo-Cobro {
+  background: #ffe082 !important;
+}
+
+.tipo-Venta {
+  background: #81c784 !important;
+}
+
+.tipo-Viaje {
+  background: #64b5f6 !important;
+}
 
 .estado-completado {
   opacity: 0.6;
@@ -18,10 +26,12 @@
   padding: 20px;
   background: #f9f9f9;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.form input, .form select, .form textarea {
+.form input,
+.form select,
+.form textarea {
   width: 100%;
   padding: 8px 12px;
   margin-bottom: 10px;
@@ -55,7 +65,7 @@
   margin-bottom: 12px;
   display: flex;
   justify-content: space-between;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s;
 }
 

@@ -5,7 +5,7 @@ import './index.css'
 
 import { registerSW } from 'virtual:pwa-register'
 
-// 🔥 registrar service worker ANTES o justo en el flujo principal
+// registrar service worker ANTES o justo en el flujo principal
 registerSW({
   immediate: true
 })
