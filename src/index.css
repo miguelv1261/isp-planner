@@ -1,54 +1,38 @@
-body {
-  margin: 0;
-  font-family: sans-serif;
-  background: #f4f6f8;
+.tipo-Cobro { background: #ffe082 !important; }
+.tipo-Venta { background: #81c784 !important; }
+.tipo-Viaje { background: #64b5f6 !important; }
+
+.estado-completado {
+  opacity: 0.6;
+  text-decoration: line-through;
 }
 
-.app {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+.desktop {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
 }
 
-.header {
-  background: #111;
-  color: white;
+.form {
   padding: 15px;
-  text-align: center;
-  font-weight: bold;
+  background: white;
 }
 
-.content {
-  flex: 1;
-  overflow-y: auto;
+.mobile {
   padding: 10px;
 }
 
 .card {
   background: white;
-  padding: 15px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 10px;
   margin-bottom: 10px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
 }
 
-.card.pendiente {
-  border-left: 5px solid orange;
-}
-
-.card.completado {
-  border-left: 5px solid green;
-  opacity: 0.7;
-}
-
-button {
-  padding: 10px;
-  border: none;
-  border-radius: 8px;
-  background: #007bff;
-  color: white;
+.quick-form {
+  display: flex;
+  gap: 5px;
 }
 
 .center {
