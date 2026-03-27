@@ -5,42 +5,31 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { supabase } from "./supabase";
 
 export default function App() {
-
     const [asesor, setAsesor] = useState(null);
     const [events, setEvents] = useState([]);
     const [eventosHoy, setEventosHoy] = useState([]);
-
     const [form, setForm] = useState({
         title: "",
         tipo: "Cobro",
-        date: ""
+        date: "",
+        descripcion: ""
     });
 
     const isMobile = window.innerWidth < 768;
 
-    // 🔔 permisos
     useEffect(() => {
         if (Notification.permission !== "granted") {
             Notification.requestPermission();
         }
     }, []);
 
-    // 🔄 realtime
     useEffect(() => {
         const channel = supabase
             .channel("eventos")
             .on(
                 "postgres_changes",
                 { event: "*", schema: "public", table: "eventos" },
-                (payload) => {
-
-                    // 🔔 notificación
-                    if (Notification.permission === "granted") {
-                        new Notification("Actividad", {
-                            body: `${payload.new?.titulo || "Actualización"}`
-                        });
-                    }
-
+                () => {
                     loadEvents();
                     loadEventosHoy();
                 }
@@ -50,24 +39,20 @@ export default function App() {
         return () => supabase.removeChannel(channel);
     }, []);
 
-    // 📅 cargar calendario
     const loadEvents = async () => {
         const { data } = await supabase.from("eventos").select("*");
-
         const formatted = data.map((e) => ({
             id: e.id,
             title: e.titulo,
             date: e.fecha,
             classNames: [`tipo-${e.tipo}`, `estado-${e.estado}`],
+            extendedProps: { descripcion: e.descripcion }
         }));
-
         setEvents(formatted);
     };
 
-    // 📱 eventos del día
     const loadEventosHoy = async () => {
         const today = new Date().toISOString().split("T")[0];
-
         const { data } = await supabase
             .from("eventos")
             .select("*")
@@ -82,23 +67,21 @@ export default function App() {
         loadEventosHoy();
     }, []);
 
-    // ➕ crear evento
     const handleAddEvent = async () => {
-        if (!form.title || !form.date) {
-            return alert("Completa datos");
-        }
+        if (!form.title || !form.date) return alert("Completa los datos");
 
         await supabase.from("eventos").insert([{
             titulo: form.title,
             fecha: form.date,
             tipo: form.tipo,
-            estado: "pendiente"
+            descripcion: form.descripcion,
+            estado: "pendiente",
+            realizado_por: null
         }]);
 
-        setForm({ title: "", tipo: "Cobro", date: "" });
+        setForm({ title: "", tipo: "Cobro", date: "", descripcion: "" });
     };
 
-    // ✅ completar
     const completarEvento = async (e) => {
         await supabase
             .from("eventos")
@@ -110,7 +93,16 @@ export default function App() {
             .eq("id", e.id);
     };
 
-    // 👤 selector asesor
+    const handleEventDrop = async (info) => {
+        const newDate = info.event.start.toISOString().split("T")[0];
+        await supabase
+            .from("eventos")
+            .update({ fecha: newDate })
+            .eq("id", info.event.id);
+        loadEvents();
+        loadEventosHoy();
+    };
+
     if (!asesor) {
         return (
             <div className="center">
@@ -124,26 +116,22 @@ export default function App() {
     return (
         <div className="app">
 
-            {/* HEADER */}
-            <div className="header">
-                ISP Planner - {asesor}
-            </div>
+            <div className="header">ISP Planner - {asesor}</div>
 
-            {/* DESKTOP */}
             {!isMobile && (
                 <div className="desktop">
 
-                    {/* CALENDARIO */}
                     <div className="calendar">
                         <FullCalendar
                             plugins={[dayGridPlugin, interactionPlugin]}
                             initialView="dayGridMonth"
                             events={events}
                             height="90vh"
+                            editable={true}
+                            eventDrop={handleEventDrop}
                         />
                     </div>
 
-                    {/* FORM */}
                     <div className="form">
                         <h3>Nuevo Evento</h3>
 
@@ -151,6 +139,12 @@ export default function App() {
                             placeholder="Titulo"
                             value={form.title}
                             onChange={(e) => setForm({ ...form, title: e.target.value })}
+                        />
+
+                        <textarea
+                            placeholder="Descripción"
+                            value={form.descripcion}
+                            onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
                         />
 
                         <select
@@ -174,7 +168,6 @@ export default function App() {
                 </div>
             )}
 
-            {/* 📱 MÓVIL */}
             {isMobile && (
                 <div className="mobile">
 
@@ -185,9 +178,9 @@ export default function App() {
                             <div>
                                 <h4>
                                     {e.tipo === "Cobro" ? "💰" :
-                                     e.tipo === "Venta" ? "🛒" : "🚗"} {e.titulo}
+                                        e.tipo === "Venta" ? "🛒" : "🚗"} {e.titulo}
                                 </h4>
-
+                                <p>{e.descripcion}</p>
                                 <p>
                                     {e.estado === "completado"
                                         ? `✅ ${e.realizado_por}`
@@ -196,14 +189,11 @@ export default function App() {
                             </div>
 
                             {e.estado !== "completado" && (
-                                <button onClick={() => completarEvento(e)}>
-                                    OK
-                                </button>
+                                <button onClick={() => completarEvento(e)}>OK</button>
                             )}
                         </div>
                     ))}
 
-                    {/* CREAR RÁPIDO */}
                     <div className="quick-form">
                         <input
                             placeholder="Nueva actividad"
