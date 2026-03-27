@@ -68,21 +68,23 @@ export default function App() {
     }, []);
 
     const handleAddEvent = async () => {
-        if (!form.title || !form.date) return alert("Completa los datos");
+        if (!form.title) return alert("Escribe un título");
+
+        const fechaEvento = form.date || new Date().toISOString().split("T")[0];
 
         await supabase.from("eventos").insert([{
             titulo: form.title,
-            fecha: form.date,
-            tipo: form.tipo,
+            fecha: fechaEvento,
+            tipo: form.tipo || "Cobro",
             estado: "pendiente",
-            asesor: asesor,           // asignamos el asesor actual
+            asesor: asesor,
             objetivo: 0,
             real: 0,
             realizado_por: null,
             fecha_completado: null
         }]);
 
-        setForm({ title: "", tipo: "Cobro", date: "", descripcion: "" });
+        setForm({ title: "", tipo: "Cobro", date: "" });
     };
 
     const completarEvento = async (e) => {
