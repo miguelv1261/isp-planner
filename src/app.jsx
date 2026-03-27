@@ -74,9 +74,12 @@ export default function App() {
             titulo: form.title,
             fecha: form.date,
             tipo: form.tipo,
-            descripcion: form.descripcion,
             estado: "pendiente",
-            realizado_por: null
+            asesor: asesor,           // asignamos el asesor actual
+            objetivo: 0,
+            real: 0,
+            realizado_por: null,
+            fecha_completado: null
         }]);
 
         setForm({ title: "", tipo: "Cobro", date: "", descripcion: "" });
