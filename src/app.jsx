@@ -12,7 +12,7 @@ export default function App() {
     const [clientes, setClientes] = useState([]);
     const [zonas, setZonas] = useState([]);
 
-    const [eventoHoy, setEventoHoy] = useState(null);
+    const [eventoHoy, setEventoHoy] = useState([]);
 
     const isMobile = window.innerWidth < 768;
 
@@ -98,11 +98,9 @@ export default function App() {
             .from("eventos")
             .select("*")
             .eq("fecha", today)
-            .limit(1);
+            .order("id", { ascending: false });
 
-        if (data.length > 0) {
-            setEventoHoy(data[0]);
-        }
+        setEventoHoy(data); // 🔥 ahora es ARRAY
     };
 
     // 🔽 CLIENTES POR ZONA
@@ -179,32 +177,31 @@ export default function App() {
                 {/* 📱 MÓVIL */}
                 {view === "calendar" && isMobile && (
                     <div>
-                        <h3>Trabajo de Hoy</h3>
+                        <h3>Actividad del día</h3>
 
-                        {!eventoHoy && <p>No tienes actividades asignadas</p>}
+                        {eventoHoy.length === 0 && <p>No hay actividad hoy</p>}
 
-                        {eventoHoy && (
-                            <>
-                                <div className="card">
-                                    <h4>{eventoHoy.titulo}</h4>
-                                    <p>📅 {eventoHoy.fecha}</p>
-                                </div>
+                        {eventoHoy.map((e) => (
+                            <div key={e.id} className="card">
+                                <h4>{e.titulo}</h4>
+                                <p>👤 {e.asesor}</p>
+                                <p>📅 {e.fecha}</p>
+                            </div>
+                        ))}
 
-                                <h4>Clientes en tu zona</h4>
+                        <h4>Clientes en zona</h4>
 
-                                {clientes.map((c) => (
-                                    <div key={c.id} className="card">
-                                        <p>{c.nombre}</p>
-                                        <p>📍 {c.ip}</p>
-                                        <p>💰 ${c.deuda}</p>
+                        {clientes.map((c) => (
+                            <div key={c.id} className="card">
+                                <p>{c.nombre}</p>
+                                <p>📍 {c.ip}</p>
+                                <p>💰 ${c.deuda}</p>
 
-                                        <button onClick={() => registrarActividad(c)}>
-                                            Registrar
-                                        </button>
-                                    </div>
-                                ))}
-                            </>
-                        )}
+                                <button onClick={() => registrarActividad(c)}>
+                                    Registrar
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 )}
 
