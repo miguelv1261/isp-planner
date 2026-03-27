@@ -77,7 +77,7 @@ export default function App() {
             fecha: fechaEvento,
             tipo: form.tipo || "Cobro",
             estado: "pendiente",
-            asesor: asesor,
+            asesor: asesor || "Asesor Default",
             objetivo: 0,
             real: 0,
             realizado_por: null,
@@ -108,14 +108,15 @@ export default function App() {
         loadEventosHoy();
     };
 
-    if (!asesor) {
-        return (
+    {/* SOLO EN MÓVIL */ }
+    {
+        isMobile && !asesor && (
             <div className="center">
                 <h2>Selecciona Asesor</h2>
                 <button onClick={() => setAsesor("Asesor 1")}>Asesor 1</button>
                 <button onClick={() => setAsesor("Asesor 2")}>Asesor 2</button>
             </div>
-        );
+        )
     }
 
     return (
